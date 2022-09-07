@@ -1,0 +1,35 @@
+#frame{   
+height: 500px;
+width: 350px;
+background-color:transparent;
+border: solid skyblue 1px;
+margin-left: 500px;
+margin-top: 50px;
+
+}
+#display{
+height:50px;
+width: 300px;
+background-color: green;
+margin-left: 20px;
+margin-top: 20px;
+border: solid black 3px;
+font-size: 12px;
+}
+#btn-container{
+margin-left: 18px;  
+margin-top: 40px;  
+}
+#btn{
+height: 70px;
+width: 70px; 
+margin: 3px;
+background-color: coral;
+}
+#clr{
+height: 45px;
+width:250px; 
+ margin-left: 30px; 
+ margin-top: 15px;
+ background-color: crimson;
+}
