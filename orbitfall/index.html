@@ -139,6 +139,8 @@ h1 {
 }
 .play:active { transform: translateY(1px); }
 .hint { font-size: 0.74rem; color: var(--muted); letter-spacing: 0.06em; }
+.alt { color: var(--muted); font-size: 0.74rem; text-underline-offset: 3px; }
+.alt:focus-visible { outline: 3px solid var(--flare); outline-offset: 3px; }
 .big {
   font-family: var(--display); font-weight: 800; font-size: clamp(4rem, 22vw, 6rem);
   line-height: 1; font-variant-numeric: tabular-nums;
@@ -195,7 +197,7 @@ h1 {
       </ul>
     </div>
     <button class="play" id="startBtn" type="button">Launch</button>
-    <div class="hint">Tap anywhere, or press Space</div>
+    <a class="alt" href="https://claude.ai/artifact/SahYf11wUPwPDwZ3r7ryWF" target="_blank" rel="noopener">Play the 3D version</a>
   </div>
 </section>
 
@@ -984,7 +986,7 @@ h1 {
     if (state === 'over' && !over.hidden && performance.now() - overAt > 900) start();
   }
   window.addEventListener('pointerdown', (e) => {
-    if (e.target.closest('button')) return;
+    if (e.target.closest('button, a')) return;
     e.preventDefault();
     press();
   }, { passive: false });
