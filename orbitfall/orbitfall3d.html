@@ -154,7 +154,7 @@ h1 sup { font-size: 0.38em; vertical-align: super; color: var(--flare); letter-s
   <div class="block">
     <div class="eyebrow">One-tap space escape</div>
     <h1>Orbitfall<sup>3D</sup></h1>
-    <p class="lede">Tap to fire your engines and break orbit. Glide into the next planet's pull before your orbit decays. Sound on is best.</p>
+    <p class="lede">Tap to fire your engines and break orbit. Glide into the next planet's pull before your orbit decays. Turn your sound on.</p>
     <p class="error" id="glError" hidden>This browser couldn't start 3D graphics. Try the 2D version instead.</p>
   </div>
   <div class="block">
@@ -825,27 +825,32 @@ h1 sup { font-size: 0.38em; vertical-align: super; color: var(--flare); letter-s
       for (let i = 0; i < len; i++) { const w = Math.random() * 2 - 1; last = (last + 0.02 * w) / 1.02; dat[i] = last * 3.5; }
       A.noise = buf;
 
+      // engine: filtered noise (the rush) plus a buzzy hum (the motor), both in the range phone speakers can play
       const eng = ac.createBufferSource(); eng.buffer = buf; eng.loop = true;
-      A.engF = ac.createBiquadFilter(); A.engF.type = 'lowpass'; A.engF.frequency.value = 260; A.engF.Q.value = 0.8;
+      A.engF = ac.createBiquadFilter(); A.engF.type = 'lowpass'; A.engF.frequency.value = 700; A.engF.Q.value = 0.8;
       A.engG = ac.createGain(); A.engG.gain.value = 0;
       eng.connect(A.engF); A.engF.connect(A.engG); A.engG.connect(A.master); eng.start();
+      A.humO = ac.createOscillator(); A.humO.type = 'sawtooth'; A.humO.frequency.value = 110;
+      A.humF = ac.createBiquadFilter(); A.humF.type = 'lowpass'; A.humF.frequency.value = 900;
+      A.humG = ac.createGain(); A.humG.gain.value = 0;
+      A.humO.connect(A.humF); A.humF.connect(A.humG); A.humG.connect(A.master); A.humO.start();
 
       A.holeG = ac.createGain(); A.holeG.gain.value = 0;
-      A.holeF = ac.createBiquadFilter(); A.holeF.type = 'lowpass'; A.holeF.frequency.value = 180; A.holeF.Q.value = 6;
+      A.holeF = ac.createBiquadFilter(); A.holeF.type = 'lowpass'; A.holeF.frequency.value = 500; A.holeF.Q.value = 5;
       A.holeO = [ac.createOscillator(), ac.createOscillator(), ac.createOscillator()];
-      A.holeO[0].type = 'sine'; A.holeO[0].frequency.value = 46;
-      A.holeO[1].type = 'sine'; A.holeO[1].frequency.value = 48.6;
-      A.holeO[2].type = 'triangle'; A.holeO[2].frequency.value = 92;
+      A.holeO[0].type = 'sawtooth'; A.holeO[0].frequency.value = 73;
+      A.holeO[1].type = 'sawtooth'; A.holeO[1].frequency.value = 76.5;
+      A.holeO[2].type = 'sine'; A.holeO[2].frequency.value = 220;
       for (const o of A.holeO) { o.connect(A.holeF); o.start(); }
       const lfo = ac.createOscillator(); lfo.frequency.value = 0.45;
-      const lfoG = ac.createGain(); lfoG.gain.value = 90;
+      const lfoG = ac.createGain(); lfoG.gain.value = 260;
       lfo.connect(lfoG); lfoG.connect(A.holeF.frequency); lfo.start();
       A.holeF.connect(A.holeG); A.holeG.connect(A.master);
 
       A.gravG = ac.createGain(); A.gravG.gain.value = 0;
       A.gravO = [ac.createOscillator(), ac.createOscillator()];
-      A.gravO[0].type = 'sine'; A.gravO[1].type = 'sine';
-      A.gravO[0].frequency.value = 196; A.gravO[1].frequency.value = 294;
+      A.gravO[0].type = 'triangle'; A.gravO[1].type = 'sine';
+      A.gravO[0].frequency.value = 330; A.gravO[1].frequency.value = 495;
       const vib = ac.createOscillator(); vib.frequency.value = 5;
       const vibG = ac.createGain(); vibG.gain.value = 3;
       vib.connect(vibG); for (const o of A.gravO) { vibG.connect(o.frequency); o.connect(A.gravG); o.start(); }
@@ -853,6 +858,29 @@ h1 sup { font-size: 0.38em; vertical-align: super; color: var(--flare); letter-s
       A.gravG.connect(A.master);
     } catch (e) { A.ac = null; }
   }
+  // iPhones mute web audio when the silent switch is on unless the page plays like media.
+  let silentEl = null;
+  function silentWav() {
+    const n = 4000, b = new Uint8Array(44 + n), v = new DataView(b.buffer);
+    const str = (o, s2) => { for (let i = 0; i < s2.length; i++) b[o + i] = s2.charCodeAt(i); };
+    str(0, 'RIFF'); v.setUint32(4, 36 + n, true); str(8, 'WAVEfmt '); v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 8000, true); v.setUint32(28, 8000, true);
+    v.setUint16(32, 1, true); v.setUint16(34, 8, true); str(36, 'data'); v.setUint32(40, n, true);
+    b.fill(128, 44);
+    let bin = ''; for (let i = 0; i < b.length; i++) bin += String.fromCharCode(b[i]);
+    return 'data:audio/wav;base64,' + btoa(bin);
+  }
+  function unlockAudio() {
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+    initAudio();
+    try {
+      if (!silentEl) { silentEl = new Audio(silentWav()); silentEl.loop = true; silentEl.setAttribute('playsinline', ''); }
+      if (silentEl.paused) { const pr = silentEl.play(); if (pr && pr.catch) pr.catch(() => {}); }
+    } catch (e) {}
+    if (A.ac && A.ac.state !== 'running') { try { A.ac.resume(); } catch (e) {} }
+  }
+  for (const ev of ['pointerdown', 'touchend', 'click', 'keydown']) window.addEventListener(ev, unlockAudio, { capture: true, passive: true });
+
   function setP(param, v, tc) { if (A.ac) param.setTargetAtTime(v, A.ac.currentTime, tc || 0.12); }
   function tone(f0, f1, dur, type, vol) {
     if (!A.ac) return;
@@ -860,7 +888,7 @@ h1 sup { font-size: 0.38em; vertical-align: super; color: var(--flare); letter-s
       const ac = A.ac, now = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
       o.type = type || 'sine';
       o.frequency.setValueAtTime(f0, now); o.frequency.exponentialRampToValueAtTime(f1, now + dur);
-      g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(vol || 0.08, now + 0.015);
+      g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(Math.min(0.5, (vol || 0.08) * 1.8), now + 0.015);
       g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
       o.connect(g); g.connect(A.master); o.start(now); o.stop(now + dur + 0.05);
     } catch (e) {}
@@ -873,7 +901,7 @@ h1 sup { font-size: 0.38em; vertical-align: super; color: var(--flare); letter-s
       const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = q || 1.2;
       f.frequency.setValueAtTime(f0, now); f.frequency.exponentialRampToValueAtTime(f1, now + dur);
       const g = ac.createGain();
-      g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(vol, now + dur * 0.2);
+      g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(Math.min(0.6, vol * 1.6), now + dur * 0.2);
       g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
       src.connect(f); f.connect(g); g.connect(A.master);
       src.start(now, rand(0, 1)); src.stop(now + dur + 0.05);
@@ -886,19 +914,21 @@ h1 sup { font-size: 0.38em; vertical-align: super; color: var(--flare); letter-s
   function updateAudio() {
     if (!A.ac) return;
     const alive = player && player.alive;
-    let eg = 0, ef = 260;
+    let eg = 0, ef = 700, hg = 0, hf = 110;
     if (alive) {
-      if (player.mode === 'fly') { eg = pw.nitro > 0 ? 0.11 : 0.075; ef = pw.nitro > 0 ? 1500 : 820; }
-      else { eg = state === 'play' ? 0.03 : 0.018; ef = 300; }
+      if (player.mode === 'fly') { eg = pw.nitro > 0 ? 0.22 : 0.16; ef = pw.nitro > 0 ? 3200 : 1800; hg = pw.nitro > 0 ? 0.07 : 0.05; hf = pw.nitro > 0 ? 165 : 130; }
+      else { eg = state === 'play' ? 0.07 : 0.04; ef = 750; hg = state === 'play' ? 0.025 : 0.015; hf = 98; }
     }
-    setP(A.engG.gain, eg, 0.18); setP(A.engF.frequency, ef, 0.25);
+    setP(A.engG.gain, eg, 0.15); setP(A.engF.frequency, ef, 0.2);
+    setP(A.humG.gain, hg, 0.15); setP(A.humO.frequency, hf, 0.25);
     let prox = 0;
     if (alive) for (const h of holes) {
       const d = Math.hypot(player.x - h.x, player.y - h.y);
       prox = Math.max(prox, clamp(1 - (d - h.r) / (h.pull * 2.2), 0, 1));
     }
-    setP(A.holeG.gain, 0.22 * Math.pow(prox, 1.6), 0.3);
-    setP(A.holeO[0].frequency, 46 - 12 * prox, 0.3); setP(A.holeO[1].frequency, 48.6 - 13 * prox, 0.3);
+    setP(A.holeG.gain, 0.3 * Math.pow(prox, 1.4), 0.3);
+    setP(A.holeO[0].frequency, 73 - 18 * prox, 0.3); setP(A.holeO[1].frequency, 76.5 - 19 * prox, 0.3);
+    setP(A.holeO[2].frequency, 220 - 90 * prox, 0.3);
     let gp = 0;
     if (alive && player.mode === 'fly') {
       for (const q of planets) {
@@ -907,8 +937,8 @@ h1 sup { font-size: 0.38em; vertical-align: super; color: var(--flare); letter-s
         gp = Math.max(gp, clamp((2.4 - ratio) / 1.4, 0, 1));
       }
     }
-    setP(A.gravG.gain, 0.045 * gp * gp, 0.1);
-    setP(A.gravO[0].frequency, 196 + 196 * gp, 0.1); setP(A.gravO[1].frequency, 294 + 294 * gp, 0.1);
+    setP(A.gravG.gain, 0.1 * gp * gp, 0.1);
+    setP(A.gravO[0].frequency, 330 + 330 * gp, 0.1); setP(A.gravO[1].frequency, 495 + 495 * gp, 0.1);
   }
   function buzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
 
@@ -1413,11 +1443,13 @@ h1 sup { font-size: 0.38em; vertical-align: super; color: var(--flare); letter-s
     muted = !muted; store.set('orbitfall.muted', muted); renderMute();
     initAudio();
     if (A.ac) setP(A.master.gain, muted ? 0 : 0.9, 0.05);
+    if (!muted) tone(660, 990, 0.15, 'sine', 0.06);
   });
   document.addEventListener('contextmenu', (e) => e.preventDefault());
   document.addEventListener('visibilitychange', () => {
     last = performance.now();
     if (A.ac) { if (document.hidden) A.ac.suspend(); else A.ac.resume(); }
+    if (silentEl) { if (document.hidden) silentEl.pause(); }
   });
   window.addEventListener('resize', () => { resize(); if (state !== 'play') reset(); });
 

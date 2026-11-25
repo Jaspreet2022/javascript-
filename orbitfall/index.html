@@ -391,6 +391,32 @@ h1 {
       o.start(now); o.stop(now + dur + 0.03);
     } catch (e) {}
   }
+  // iPhones mute web audio when the silent switch is on unless the page plays like media.
+  let silentEl = null;
+  function silentWav() {
+    const n = 4000, b = new Uint8Array(44 + n), v = new DataView(b.buffer);
+    const str = (o, s2) => { for (let i = 0; i < s2.length; i++) b[o + i] = s2.charCodeAt(i); };
+    str(0, 'RIFF'); v.setUint32(4, 36 + n, true); str(8, 'WAVEfmt '); v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 8000, true); v.setUint32(28, 8000, true);
+    v.setUint16(32, 1, true); v.setUint16(34, 8, true); str(36, 'data'); v.setUint32(40, n, true);
+    b.fill(128, 44);
+    let bin = ''; for (let i = 0; i < b.length; i++) bin += String.fromCharCode(b[i]);
+    return 'data:audio/wav;base64,' + btoa(bin);
+  }
+  function unlockAudio() {
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+    try {
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      if (ac.state !== 'running') ac.resume();
+    } catch (e) {}
+    try {
+      if (!silentEl) { silentEl = new Audio(silentWav()); silentEl.loop = true; silentEl.setAttribute('playsinline', ''); }
+      if (silentEl.paused) { const pr = silentEl.play(); if (pr && pr.catch) pr.catch(() => {}); }
+    } catch (e) {}
+  }
+  for (const ev of ['pointerdown', 'touchend', 'click', 'keydown']) window.addEventListener(ev, unlockAudio, { capture: true, passive: true });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && silentEl) silentEl.pause(); });
+
   function noteFor(n) {
     const scale = [0, 2, 4, 7, 9];
     const semi = scale[n % 5] + 12 * (Math.floor(n / 5) % 3);
