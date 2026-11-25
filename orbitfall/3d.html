@@ -263,14 +263,14 @@ h1 sup { font-size: 0.38em; vertical-align: super; color: var(--flare); letter-s
     renderer = new THREE.WebGLRenderer({ canvas: $('gl'), antialias: true, powerPreference: 'high-performance' });
   } catch (e) { $('glError').hidden = false; $('startBtn').hidden = true; return; }
   const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x0b1233, 0.02);
+  scene.fog = new THREE.FogExp2(0x0d1438, 0.058);
   const camera = new THREE.PerspectiveCamera(65, 1, 0.1, 600);
   camera.rotation.order = 'YXZ';
   let composer = null;
   const hasBloom = !!(THREE.EffectComposer && THREE.RenderPass && THREE.UnrealBloomPass);
 
   scene.add(new THREE.HemisphereLight(0x8fa8ff, 0x140c24, 0.5));
-  const sun = new THREE.DirectionalLight(0xffe2b8, 1.5);
+  const sun = new THREE.DirectionalLight(0xffe2b8, 1.2);
   sun.position.set(0.15, 0.35, -1);
   scene.add(sun);
   const fill = new THREE.DirectionalLight(0x7f9cff, 0.55);
@@ -462,8 +462,8 @@ h1 sup { font-size: 0.38em; vertical-align: super; color: var(--flare); letter-s
     sunFlare.scale.setScalar(150); sunFlare.position.copy(sunPos);
     sky.add(sunGlow, sunFlare, sunCore);
 
-    const giant = new THREE.Mesh(GEO.sphere, new THREE.MeshStandardMaterial({ map: planetTex('#b9774a', true), roughness: 0.9, fog: false }));
-    giant.scale.setScalar(60); giant.position.set(-120, 30, -240); giant.rotation.set(0.2, 0.5, 0.25);
+    const giant = new THREE.Mesh(GEO.sphere, new THREE.MeshStandardMaterial({ map: planetTex('#b9774a', true), color: 0x8a8090, roughness: 0.9, fog: false }));
+    giant.scale.setScalar(30); giant.position.set(-140, 75, -300); giant.rotation.set(0.2, 0.5, 0.25);
     const ringed = new THREE.Mesh(GEO.sphere, new THREE.MeshStandardMaterial({ map: planetTex('#d8b98a'), roughness: 0.9, fog: false }));
     ringed.scale.setScalar(11); ringed.position.set(30, 70, -330);
     const rr = new THREE.Mesh(GEO.disk, new THREE.MeshBasicMaterial({ map: ringTex, transparent: true, side: THREE.DoubleSide, depthWrite: false, fog: false, opacity: 0.8 }));
@@ -545,11 +545,6 @@ h1 sup { font-size: 0.38em; vertical-align: super; color: var(--flare); letter-s
   const trailLine = new THREE.Line(trailGeo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
   trailLine.frustumCulled = false;
   scene.add(trailLine);
-  const laneMat = new THREE.LineDashedMaterial({ color: 0x5fb3ff, dashSize: 0.6, gapSize: 0.9, transparent: true, opacity: 0.35 });
-  const lanes = [0, 1].map(() => {
-    const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 20), new THREE.Vector3(0, 0, -160)]), laneMat);
-    l.computeLineDistances(); l.frustumCulled = false; scene.add(l); return l;
-  });
 
   // particles pool
   const PN = 1000;
@@ -575,7 +570,7 @@ h1 sup { font-size: 0.38em; vertical-align: super; color: var(--flare); letter-s
   let planets = [], dust = [], texts = [], trail = [];
   let meteors = [], comets = [], warnings = [], holes = [], pickups = [];
   let banner = null, seen = {};
-  let player = null, camY = 0, camFX = 0, camYaw = 0, camRoll = 0, score = 0, t = 0, speed = 230, nextY = 0, idx = 0, lastHole = -99;
+  let player = null, camY = 0, camA = { x: 0, y: 0 }, camDir = { x: 0, y: -1 }, camRoll = 0, lastYaw = 0, score = 0, t = 0, speed = 230, nextY = 0, idx = 0, lastHole = -99;
   let reached = 0, cometTimer = 4;
   let pw = { shield: false, nitro: 0, magnet: 0, stable: 0 }, invuln = 0, chipEls = {};
   let overAt = 0, shake = 0;
@@ -589,7 +584,7 @@ h1 sup { font-size: 0.38em; vertical-align: super; color: var(--flare); letter-s
     return { x: (v3.x + 1) / 2 * W, y: (1 - v3.y) / 2 * H, behind: v3.z > 1 };
   }
   function inView(y) { if (y - camY < -H * 0.7) return false; const p = proj(W / 2, y); return !p.behind && p.y > 0 && p.y < H; }
-  function nearView(y) { const sy = y - camY; return sy > -H * 2.8 && sy < H * 1.5; }
+  function nearView(y) { const ahead = camY + H * 0.62 - y; return ahead < 880 * k && ahead > -H * 0.9; }
 
   function resize() {
     W = window.innerWidth; H = window.innerHeight;
@@ -600,7 +595,7 @@ h1 sup { font-size: 0.38em; vertical-align: super; color: var(--flare); letter-s
     fx.width = Math.round(W * dpr); fx.height = Math.round(H * dpr);
     fctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     camera.aspect = W / H;
-    VFOV = camera.aspect < 1 ? 68 : 55;
+    VFOV = camera.aspect < 1 ? 64 : 50;
     camera.fov = VFOV; camera.updateProjectionMatrix();
     const hf = Math.atan(Math.tan((VFOV / 2) * Math.PI / 180) * camera.aspect);
     CAM_D = clamp((FIELD * 0.38) / Math.tan(hf), 6, 15);
@@ -609,7 +604,7 @@ h1 sup { font-size: 0.38em; vertical-align: super; color: var(--flare); letter-s
       if (!composer) {
         composer = new THREE.EffectComposer(renderer);
         composer.addPass(new THREE.RenderPass(scene, camera));
-        composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(W, H), 0.8, 0.6, 0.6));
+        composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(W, H), 0.75, 0.55, 0.78));
       }
       composer.setPixelRatio(dpr);
       composer.setSize(W, H);
@@ -739,10 +734,10 @@ h1 sup { font-size: 0.38em; vertical-align: super; color: var(--flare); letter-s
     const d = Math.min(idx / 40, 1);
     const prev = planets[planets.length - 1];
     const wantHole = idx >= HOLE_FROM && idx - lastHole >= 3 && Math.random() < Math.min(0.38, 0.2 + (idx - HOLE_FROM) * 0.01);
-    const gap = (rand(150, 215) + 55 * d + (wantHole ? 40 : 0)) * k;
+    const gap = (rand(150, 215) + 55 * d + (wantHole ? 40 : 0)) * k * 1.35;
     nextY -= gap;
     const r = rand(15, 27) * k;
-    const cap = r + (58 - 18 * d) * k;
+    const cap = r + (66 - 18 * d) * k;
     const margin = Math.min(r + 30 * k, W / 3);
     let x = rand(margin, W - margin);
     if (prev && Math.abs(x - prev.bx) < 40 * k) x = clamp(x + (x < W / 2 ? 70 : -70) * k, margin, W - margin);
@@ -808,7 +803,7 @@ h1 sup { font-size: 0.38em; vertical-align: super; color: var(--flare); letter-s
       left: null, flyT: 0, alive: true, ang: 0, boost: 0, roll: 0 };
     placeOnOrbit();
     player.ang = headingTarget();
-    camY = home.y - H * 0.62; camFX = home.x;
+    camY = home.y - H * 0.62; camA = { x: home.x, y: home.y }; camDir = { x: 0, y: -1 }; lastYaw = 0;
     renderPowers();
     updateScore(false);
   }
@@ -1078,7 +1073,7 @@ h1 sup { font-size: 0.38em; vertical-align: super; color: var(--flare); letter-s
       if (cometTimer <= 0) {
         cometTimer = rand(5, 8.5) - Math.min(reached, 40) * 0.06;
         const side = Math.random() < 0.5 ? -1 : 1;
-        warnings.push({ side, y: camY + rand(-H * 0.25, H * 0.5), life: 1.3, spd: (360 + Math.min(reached, 40) * 4) * k });
+        warnings.push({ side, y: camY + H * 0.62 - rand(70, 330) * k, life: 1.3, spd: (360 + Math.min(reached, 40) * 4) * k });
         announce('comet');
         tone(880, 880, 0.12, 'sine', 0.03); setTimeout(() => tone(880, 880, 0.12, 'sine', 0.03), 220);
       }
@@ -1087,13 +1082,13 @@ h1 sup { font-size: 0.38em; vertical-align: super; color: var(--flare); letter-s
       w.life -= dt;
       if (w.life <= 0) {
         const ang = rand(-0.25, 0.25);
-        const c = { x: w.side < 0 ? -0.6 * W : 1.6 * W, y: w.y, vx: -w.side * Math.cos(ang) * w.spd, vy: Math.sin(ang) * w.spd, r: 7 * k };
+        const c = { x: w.side < 0 ? -0.9 * W : 1.9 * W, y: w.y, vx: -w.side * Math.cos(ang) * w.spd, vy: Math.sin(ang) * w.spd, r: 7 * k };
         comets.push(c); buildComet(c);
         whoosh(3000, 500, 1.6, 0.07, 3);
       }
     }
     warnings = warnings.filter((w) => w.life > 0);
-    for (const c of comets) { c.x += c.vx * dt; c.y += c.vy * dt; if (c.x < -0.8 * W || c.x > 1.8 * W) c.dead = true; }
+    for (const c of comets) { c.x += c.vx * dt; c.y += c.vy * dt; if (c.x < -1 * W || c.x > 2 * W) c.dead = true; }
 
     if (state === 'play') {
       let changed = false;
@@ -1126,7 +1121,7 @@ h1 sup { font-size: 0.38em; vertical-align: super; color: var(--flare); letter-s
           if (q.cap > 0 && dist < capR(q)) { capture(q, dist); break; }
         }
         // out of the lane, back under the camera, or lost in deep space
-        if (player.alive && (player.x < -0.14 * W || player.x > 1.14 * W || player.y - camY > H * 1.15 || player.y - camY < -H * 2.2 || player.flyT > 5)) crash('Your ship drifted off into deep space.');
+        if (player.alive && (player.x < -0.45 * W || player.x > 1.45 * W || player.y - camY > H * 1.15 || player.y - camY < -H * 2.2 || player.flyT > 5)) crash('Your ship drifted off into deep space.');
         const back = player.ang + Math.PI, nit = pw.nitro > 0;
         const px = -Math.sin(player.ang), py = Math.cos(player.ang);
         for (const side of [-1, 1]) {
@@ -1221,25 +1216,37 @@ h1 sup { font-size: 0.38em; vertical-align: super; color: var(--flare); letter-s
   // ================= render =================
   const orbitCol = new THREE.Color(), dangerCol = new THREE.Color(0xff5a6e);
   function syncScene(dt) {
-    // chase camera: low behind the action, looking ahead toward the horizon
+    // close chase camera: just behind the ship's current planet (or the ship in flight), facing where you're headed
     const focusY = camY + H * 0.62;
-    const fxTarget = player.alive ? (player.mode === 'orbit' ? player.pl.x : player.x) : camFX;
-    camFX += (fxTarget - camFX) * Math.min(1, dt * 1.6);
-    const toFocus = PITCH + Math.atan(Math.tan(VFOV / 2 * Math.PI / 180) * SHIP_AT);
-    const Fx = wx(camFX) * 0.6, Fz = wz(focusY);
-    const yawT = player.alive && player.mode === 'fly' ? clamp(-player.vx / (speed * 1.5), -1, 1) * 0.07 : 0;
-    const rollT = player.alive && player.mode === 'fly' ? clamp(player.vx / (speed * 1.5), -1, 1) * 0.05 : 0;
-    camYaw += (yawT - camYaw) * Math.min(1, dt * 1.5);
-    camRoll += (rollT - camRoll) * Math.min(1, dt * 1.5);
+    if (player.alive) {
+      const ax = player.mode === 'orbit' ? player.pl.x : player.x, ay = player.mode === 'orbit' ? player.pl.y : player.y;
+      const ra = Math.min(1, dt * (player.mode === 'orbit' ? 2.2 : 3.2));
+      camA.x += (ax - camA.x) * ra; camA.y += (ay - camA.y) * ra;
+      let dx = 0, dy = -1;
+      if (player.mode === 'orbit') {
+        const nx = planets.find((q) => !q.visited && q.idx > player.pl.idx);
+        if (nx) { dx = nx.x - player.pl.x; dy = nx.y - player.pl.y; }
+      } else { dx = player.vx; dy = player.vy; }
+      let l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
+      dx *= 0.8; dy = dy * 0.8 - 0.2;
+      if (dy > -0.25) dy = -0.25;             // never swing round to look backwards
+      l = Math.hypot(dx, dy); dx /= l; dy /= l;
+      const rd = Math.min(1, dt * 2);
+      camDir.x += (dx - camDir.x) * rd; camDir.y += (dy - camDir.y) * rd;
+      l = Math.hypot(camDir.x, camDir.y) || 1; camDir.x /= l; camDir.y /= l;
+    }
+    const yaw = Math.atan2(camDir.x, -camDir.y);
+    const yawRate = dt > 0 ? (yaw - lastYaw) / dt : 0; lastYaw = yaw;
+    camRoll += (clamp(-yawRate * 0.25, -0.14, 0.14) - camRoll) * Math.min(1, dt * 3);
+    const Ax = wx(camA.x), Az = wz(camA.y);
+    const back = 4.7 + player.pl.r * S * 1.6, up = 1.5;
     const sh = shake > 0.01 ? shake : 0;
-    camera.position.set(Fx + rand(-sh, sh), CAM_D * Math.sin(toFocus) + rand(-sh, sh), Fz + CAM_D * Math.cos(toFocus));
-    camera.rotation.set(-PITCH, camYaw, camRoll);
+    camera.position.set(Ax - camDir.x * back + rand(-sh, sh), up + rand(-sh, sh), Az - camDir.y * back);
+    camera.lookAt(Ax + camDir.x * 7, 0.15, Az + camDir.y * 7);
+    camera.rotateZ(camRoll);
     camera.updateMatrixWorld();
     sky.position.copy(camera.position);
 
-    for (let i = 0; i < 2; i++) {
-      lanes[i].position.set(wx(i ? 1.14 * W : -0.14 * W), -0.02, Fz);
-    }
 
     for (const pl of planets) {
       // planets you have already passed drop out so they don't block the camera
@@ -1251,8 +1258,8 @@ h1 sup { font-size: 0.38em; vertical-align: super; color: var(--flare); letter-s
       pl.body.rotation.y += dt * 0.3;
       const current = player.pl === pl;
       pl.mat.opacity = pl.visited && !current ? 0.45 : 1;
-      pl.mat.emissiveIntensity = current ? 0.22 : 0.1;
-      pl.atm.material.opacity = current ? 0.32 : pl.visited ? 0.05 : 0.16;
+      pl.mat.emissiveIntensity = current ? 0.12 : 0.06;
+      pl.atm.material.opacity = current ? 0.2 : pl.visited ? 0.04 : 0.14;
       pl.ring.visible = !pl.visited && pl.cap > 0;
       if (pl.ring.visible) {
         pl.ring.scale.setScalar(capR(pl) * S);
@@ -1301,7 +1308,7 @@ h1 sup { font-size: 0.38em; vertical-align: super; color: var(--flare); letter-s
       ship.rotation.set(0, -player.ang, 0);
       shipModel.rotation.x = player.roll + Math.sin(t * 2.2) * 0.06;
       shipModel.position.y = Math.sin(t * 1.7) * 0.03;
-      shipModel.scale.setScalar(34 * k * S);
+      shipModel.scale.setScalar(30 * k * S);
       const nit = pw.nitro > 0;
       for (let i = 0; i < 2; i++) {
         const len = player.boost * (0.5 + Math.random() * 0.18) * (nit ? 1.6 : 1);
@@ -1313,7 +1320,7 @@ h1 sup { font-size: 0.38em; vertical-align: super; color: var(--flare); letter-s
       shipLight.intensity = 0.5 + player.boost * 1.1;
       shield.visible = shieldRing.visible = pw.shield;
       if (pw.shield) {
-        const s = (0.62 + Math.sin(t * 5) * 0.02) * 34 * k * S;
+        const s = (0.62 + Math.sin(t * 5) * 0.02) * 30 * k * S;
         shield.scale.setScalar(s); shieldRing.scale.set(s, s, s * 0.6);
         shieldRing.rotation.x = t * 1.5; shieldRing.rotation.y = t;
       }
@@ -1367,10 +1374,11 @@ h1 sup { font-size: 0.38em; vertical-align: super; color: var(--flare); letter-s
     }
     fctx.globalAlpha = 1; fctx.shadowBlur = 0;
     for (const w of warnings) {
-      const p = proj(w.side < 0 ? 0 : W, w.y);
-      const sy = clamp(p.behind ? H - 40 : p.y, H * 0.3, H - 40);
-      const x = w.side < 0 ? 16 : W - 16;
-      fctx.save(); fctx.translate(x, sy); if (w.side > 0) fctx.scale(-1, 1);
+      const p = proj(w.side < 0 ? -0.2 * W : 1.2 * W, w.y);
+      const left = p.behind ? w.side < 0 : p.x < W / 2;
+      const sy = clamp(p.behind ? H * 0.6 : p.y, H * 0.3, H - 60);
+      const x = left ? 16 : W - 16;
+      fctx.save(); fctx.translate(x, sy); if (!left) fctx.scale(-1, 1);
       fctx.globalAlpha = 0.55 + 0.45 * Math.sin(t * 18);
       fctx.fillStyle = '#ff7a8a'; fctx.shadowColor = '#ff7a8a'; fctx.shadowBlur = 14;
       fctx.beginPath(); fctx.moveTo(-6, -11); fctx.lineTo(10, 0); fctx.lineTo(-6, 11); fctx.closePath(); fctx.fill();
