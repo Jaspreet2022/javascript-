@@ -53,7 +53,7 @@ body {
 .wpn { font-size: 0.62rem; letter-spacing: 0.14em; color: var(--muted); text-transform: uppercase; }
 .hud-right { justify-self: end; display: flex; align-items: center; gap: 10px; }
 .lives { display: flex; gap: 4px; }
-.lives svg { width: 18px; height: 18px; color: var(--cyan); filter: drop-shadow(0 0 4px rgba(111, 227, 255, 0.6)); }
+.lives svg { width: 18px; height: 18px; color: var(--rose); filter: drop-shadow(0 0 4px rgba(255, 106, 138, 0.6)); }
 .mute {
   pointer-events: auto; width: 40px; height: 40px; border-radius: 50%;
   border: 1px solid rgba(238, 241, 255, 0.22); background: rgba(5, 7, 26, 0.45); color: var(--ink);
@@ -61,6 +61,9 @@ body {
 }
 .mute svg { width: 18px; height: 18px; }
 .bossbar { grid-column: 2; display: grid; gap: 4px; justify-items: center; width: min(46vw, 260px); padding-top: 4px; }
+@media (max-width: 640px) {
+  .bossbar { grid-column: 1 / -1; grid-row: 2; justify-self: center; width: min(80vw, 320px); }
+}
 .bossbar span { font-size: 0.62rem; letter-spacing: 0.2em; color: var(--rose); text-transform: uppercase; }
 .bossbar b { display: block; width: 100%; height: 6px; border-radius: 6px; background: rgba(238, 241, 255, 0.15); overflow: hidden; }
 .bossbar i { display: block; height: 100%; background: linear-gradient(90deg, var(--rose), var(--flare)); transform-origin: left; }
@@ -133,7 +136,7 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
     <div class="score" id="score">0</div>
     <div class="wpn" id="wpn">Blaster I</div>
   </div>
-  <div class="bossbar" id="bossbar" hidden><span id="bossName">Hive Core</span><b><i id="bossFill"></i></b></div>
+  <div class="bossbar" id="bossbar" hidden><span id="bossName">Void Medusa</span><b><i id="bossFill"></i></b></div>
   <div class="hud-right">
     <div class="lives" id="lives" aria-label="Lives"></div>
     <button class="mute" id="mute" type="button" aria-label="Mute sound" aria-pressed="false"></button>
@@ -146,13 +149,14 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
   <div class="block">
     <div class="eyebrow">Arcade space shooter</div>
     <h1>Nova Raid</h1>
-    <p class="lede">Fight through waves of drones, lancers and turret orbs, then break the armoured core waiting at the end of every stage.</p>
+    <p class="lede">Skim low over alien mountains, blast through waves of drones, lancers and ground cannons, then take down the giant medusa waiting at the end of every stage.</p>
+    <p class="hint" id="rotateTip" hidden>Tip: turn your phone sideways for a bigger view.</p>
     <p class="error" id="glError" hidden>This browser couldn't start 3D graphics.</p>
   </div>
   <div class="block">
     <ul class="how">
       <li><b>Drag anywhere</b> to fly. Your blasters fire on their own.</li>
-      <li><b>Bomb</b> wipes enemy fire and hits everything on screen.</li>
+      <li><b>Bomb</b> wipes enemy fire and hits everything on screen. Don't fly into the mountains.</li>
       <li>Grab <b style="color:#ffb35c">orange</b> for weapons, <b style="color:#6fe3ff">cyan</b> for shields, <b style="color:#b896ff">violet</b> for bombs, <b style="color:#ff6a8a">rose</b> for a life.</li>
     </ul>
     <button class="play" id="startBtn" type="button">Start mission</button>
@@ -186,7 +190,7 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
   const $ = (id) => document.getElementById(id);
   const ICON_ON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
   const ICON_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="m16 9 6 6"/><path d="m22 9-6 6"/></svg>';
-  const SHIP_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M22 12 6 4l3 8-3 8z"/></svg>';
+  const SHIP_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7.5-4.6-9.5-9.2C1 8.4 3.2 5 6.6 5c2 0 3.6 1.1 4.4 2.6h2C13.8 6.1 15.4 5 17.4 5 20.8 5 23 8.4 21.5 11.8 19.5 16.4 12 21 12 21z"/></svg>';
   const store = {
     get(key, fb) { try { const v = localStorage.getItem(key); return v === null ? fb : JSON.parse(v); } catch (e) { return fb; } },
     set(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } catch (e) {} }
@@ -212,12 +216,12 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
   catch (e) { $('glError').hidden = false; $('startBtn').hidden = true; return; }
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 400);
-  camera.up.set(0, 0, 1);
+  camera.up.set(0, 1, 0);   // side-on view: screen up is world +Y
   let composer = null;
   const hasBloom = !!(THREE.EffectComposer && THREE.RenderPass && THREE.UnrealBloomPass);
   scene.add(new THREE.HemisphereLight(0x9fb2ff, 0x1a0f2a, 0.6));
   const keyLight = new THREE.DirectionalLight(0xfff0dc, 1.2);
-  keyLight.position.set(-3, -4, 8);
+  keyLight.position.set(-4, 7, 9);
   scene.add(keyLight);
 
   function canvasTex(w, h, draw) {
@@ -238,11 +242,11 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
   });
   // one sky per stage theme
   const THEMES = [
-    { sky: ['#05071a', '#130f3a', '#2a1650'], blobs: ['#3a1f6e', '#14306b', '#4a1d4f'], planet: '#c9874f', boss: 0xff5a6e, name: 'Hive Core' },
-    { sky: ['#03101a', '#0a2a3a', '#103a3f'], blobs: ['#0f4a5a', '#14306b', '#1d5a4a'], planet: '#7fd1c7', boss: 0xffb35c, name: 'Ember Core' },
-    { sky: ['#140612', '#3a0f26', '#4a1a1a'], blobs: ['#6e1f3a', '#4a1d2f', '#6b3a14'], planet: '#ff8fa3', boss: 0x7dffb0, name: 'Verdant Core' },
-    { sky: ['#06061a', '#0f1240', '#1a1a5a'], blobs: ['#1f2a6e', '#3a1f6e', '#0f3a6b'], planet: '#c3a6ff', boss: 0x6fe3ff, name: 'Glacier Core' },
-    { sky: ['#0d0a05', '#2a1a0a', '#3a2a10'], blobs: ['#5a3a10', '#4a2a1d', '#6b5a14'], planet: '#e8d27a', boss: 0xff6fd8, name: 'Prism Core' }
+    { sky: ['#05071a', '#130f3a', '#2a1650'], blobs: ['#3a1f6e', '#14306b', '#4a1d4f'], planet: '#c9874f', boss: 0xff5a6e, name: 'Void Medusa', rock: 0x4a3f5f, far: 0x241c3a },
+    { sky: ['#03101a', '#0a2a3a', '#103a3f'], blobs: ['#0f4a5a', '#14306b', '#1d5a4a'], planet: '#7fd1c7', boss: 0xffb35c, name: 'Ember Medusa', rock: 0x2f4a4a, far: 0x14282e },
+    { sky: ['#140612', '#3a0f26', '#4a1a1a'], blobs: ['#6e1f3a', '#4a1d2f', '#6b3a14'], planet: '#ff8fa3', boss: 0x7dffb0, name: 'Thorn Medusa', rock: 0x5a2f35, far: 0x2e1420 },
+    { sky: ['#06061a', '#0f1240', '#1a1a5a'], blobs: ['#1f2a6e', '#3a1f6e', '#0f3a6b'], planet: '#c3a6ff', boss: 0x6fe3ff, name: 'Frost Medusa', rock: 0x3a4466, far: 0x1a1e3a },
+    { sky: ['#0d0a05', '#2a1a0a', '#3a2a10'], blobs: ['#5a3a10', '#4a2a1d', '#6b5a14'], planet: '#e8d27a', boss: 0xff6fd8, name: 'Prism Medusa', rock: 0x5a4a2f, far: 0x2e2414 }
   ];
   const skyTex = THEMES.map((th) => canvasTex(512, 1024, (g, w, h) => {
     const bg = g.createLinearGradient(0, 0, w, h);
@@ -341,10 +345,74 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
   bgRing.scale.setScalar(14); bgRing.rotation.set(0.5, 0.4, 0);
   scene.add(bgRing);
 
+  // ================= terrain: a near rocky ridge and a far mountain range =================
+  const TER = { seed: [0, 0, 0, 0], tiles: [], far: [], scroll: 0 };
+  const SCROLL = 3.2;
+  function terrainH(u) {
+    const [a, b, c, d] = TER.seed;
+    const h = 0.85 + 0.85 * Math.pow(Math.abs(Math.sin(u * 0.23 + a)), 1.6) + 0.5 * Math.sin(u * 0.61 + b)
+      + 0.28 * Math.sin(u * 1.7 + c) + 0.9 * Math.pow(Math.max(0, Math.sin(u * 0.085 + d)), 3);
+    return clamp(h * 0.72, 0.2, 2.0);
+  }
+  function farH(u) {
+    const [a, b] = TER.seed;
+    return 2.2 + 2.6 * Math.pow(Math.abs(Math.sin(u * 0.07 + b)), 1.3) + 1.2 * Math.sin(u * 0.19 + a) + 0.5 * Math.sin(u * 0.53);
+  }
+  function groundY(x) { return -FY + terrainH(x + TER.scroll); }
+  const rockMat = new THREE.MeshStandardMaterial({ color: 0x4a3f5f, roughness: 0.95, metalness: 0.05, flatShading: true, side: THREE.DoubleSide });
+  const farMat = new THREE.MeshStandardMaterial({ color: 0x241c3a, roughness: 1, flatShading: true, side: THREE.DoubleSide });
+  const STEP = 0.3;
+  function terrainGeo(u0, cols, heightFn, zs, baseY, jag) {
+    const rows = zs.length, pos = [], idx = [];
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const u = u0 + c * STEP;
+      const j = r === 0 || r === rows - 1 ? 0 : Math.sin(u * 5.3 + r * 7.1) * jag;
+      const y = heightFn(u) * (r === rows - 1 ? 0.8 : r === 0 ? 0.7 : 1) + j;
+      pos.push(c * STEP, y, zs[r]);
+    }
+    for (let r = 0; r < rows - 1; r++) for (let c = 0; c < cols - 1; c++) {
+      const i = r * cols + c;
+      idx.push(i, i + cols, i + 1, i + 1, i + cols, i + cols + 1);
+    }
+    const fs = pos.length / 3;
+    for (let c = 0; c < cols; c++) { const i = (rows - 1) * cols + c; pos.push(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2], pos[i * 3], baseY, pos[i * 3 + 2]); }
+    for (let c = 0; c < cols - 1; c++) { const a = fs + c * 2; idx.push(a, a + 1, a + 2, a + 2, a + 1, a + 3); }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setIndex(idx); g.computeVertexNormals();
+    return g;
+  }
+  function makeTiles(list, mat, count) {
+    for (let i = 0; i < count; i++) { const m = new THREE.Mesh(new THREE.BufferGeometry(), mat); scene.add(m); list.push({ m, u0: 0, dirty: true }); }
+  }
+  makeTiles(TER.tiles, rockMat, 2);
+  makeTiles(TER.far, farMat, 2);
+  function tileCols(far) { return Math.ceil(((far ? 3.2 : 1) * (2 * FX + 10)) / STEP) + 1; }
+  function layoutTerrain(force) {
+    const nc = tileCols(false), nLen = (nc - 1) * STEP;
+    const fc = tileCols(true), fLen = (fc - 1) * STEP;
+    const farScroll = TER.scroll * 0.35;
+    if (force || TER.tiles.some((tl) => tl.dirty)) {
+      TER.tiles.forEach((tl, i) => { tl.u0 = TER.scroll - FX - 5 + i * nLen; tl.dirty = true; });
+      TER.far.forEach((tl, i) => { tl.u0 = farScroll - 1.6 * FX - 8 + i * fLen; tl.dirty = true; });
+    }
+    for (const [list, cols, len, scroll, far] of [[TER.tiles, nc, nLen, TER.scroll, false], [TER.far, fc, fLen, farScroll, true]]) {
+      for (const tl of list) {
+        if (tl.u0 + len - scroll < (far ? -3.2 * FX - 10 : -FX - 6)) { tl.u0 = Math.max(...list.map((o) => o.u0)) + len; tl.dirty = true; }
+        if (tl.dirty) {
+          tl.m.geometry.dispose();
+          tl.m.geometry = far ? terrainGeo(tl.u0, cols, farH, [-26, -22, -18], -14, 0.6) : terrainGeo(tl.u0, cols, terrainH, [-1.3, -0.6, 0.1, 0.8, 1.4], -40, 0.12);
+          tl.dirty = false;
+        }
+        tl.m.position.set(tl.u0 - scroll, far ? -FY - 4.5 : -FY, 0);
+      }
+    }
+  }
+
   // ================= player ship =================
   const ship = new THREE.Group();
   const shipModel = new THREE.Group();
-  shipModel.rotation.x = Math.PI / 2;   // model is built Y-up; the world is Z-up
+  // side view: the model's Y-up matches the screen's up, wings point toward/away from the camera
   ship.add(shipModel);
   const flames = [];
   (() => {
@@ -371,7 +439,7 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
       parts.push(pod, ring, tip, fl);
     }
     shipModel.add(...parts);
-    shipModel.scale.setScalar(1.25);
+    shipModel.scale.setScalar(1.35);
   })();
   const shipLight = new THREE.PointLight(0x4fb8ff, 1.4, 5); shipLight.position.set(-1, 0, 0.5); ship.add(shipLight);
   const shieldMesh = new THREE.Mesh(GEO.low, new THREE.MeshBasicMaterial({ color: 0x6fe3ff, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false }));
@@ -503,13 +571,12 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
   function buzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
 
   // ================= field & camera =================
-  let W = 0, H = 0, portrait = false, FX = 14, FY = 5, D = 20;
+  let W = 0, H = 0, portrait = false, FX = 14, FY = 5, D = 20, unitsPerPx = 0.02;
   const TILT = 0.5;
   const v3 = new THREE.Vector3();
   function placeCamera(dist, swayX, swayY) {
-    const off = portrait ? new THREE.Vector3(-1, 0, 0) : new THREE.Vector3(0, -1, 0);
-    camera.position.set(off.x * dist * Math.sin(TILT) + swayX, off.y * dist * Math.sin(TILT) + swayY, dist * Math.cos(TILT));
-    camera.lookAt(swayX * 0.6, swayY * 0.6, 0);
+    camera.position.set(swayX - 1.2, swayY + 0.7, dist);
+    camera.lookAt(swayX * 0.6, swayY * 0.6 - 0.1, 0);
     camera.updateMatrixWorld();
   }
   function fits(dist) {
@@ -524,13 +591,18 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
     W = window.innerWidth; H = window.innerHeight; portrait = H > W;
     const dpr = Math.min(window.devicePixelRatio || 1, 1.75);
     renderer.setPixelRatio(dpr); renderer.setSize(W, H, false);
-    camera.aspect = W / H; camera.fov = portrait ? 62 : 50; camera.updateProjectionMatrix();
+    camera.aspect = W / H; camera.fov = 50; camera.updateProjectionMatrix();
     FY = 5;
-    FX = FY * Math.max(W, H) / Math.min(W, H) * 0.92;
+    FX = Math.max(FY * 1.6, FY * (W / H) * 0.92);
     let lo = 4, hi = 120;
     for (let i = 0; i < 24; i++) { const mid = (lo + hi) / 2; if (fits(mid)) hi = mid; else lo = mid; }
     D = hi;
-    bgPlanet.position.set(portrait ? 30 : 36, portrait ? -22 : 26, -95);
+    placeCamera(D, 0, 0);
+    const pa = new THREE.Vector3(-FX, 0, 0).project(camera), pb = new THREE.Vector3(FX, 0, 0).project(camera);
+    unitsPerPx = (2 * FX) / Math.max(1, (pb.x - pa.x) / 2 * W);
+    bgPlanet.position.set(-FX * 2.2, FY * 2.2, -95);
+    $('rotateTip').hidden = !portrait;
+    TER.tiles.forEach((tl) => { tl.dirty = true; }); TER.far.forEach((tl) => { tl.dirty = true; });
     if (hasBloom) {
       if (!composer) {
         composer = new THREE.EffectComposer(renderer);
@@ -553,6 +625,9 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
     scene.background = skyTex[(n - 1) % THEMES.length];
     bgPlanet.material.map = planetTex(th.planet); bgPlanet.material.needsUpdate = true;
     bgRing.visible = n % 2 === 0;
+    rockMat.color.setHex(th.rock); farMat.color.setHex(th.far);
+    TER.seed = [rand(0, 6), rand(0, 6), rand(0, 6), rand(0, 6)];
+    layoutTerrain(true);
   }
   function renderHud() {
     $('score').textContent = score.toLocaleString();
@@ -619,6 +694,17 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
     obj.add(m);
     return addEnemy({ type: 'rock', x, y, vx: -rand(2, 3.2), vy: rand(-0.6, 0.6), hp: size > 0.7 ? 5 : 1, r: size * 0.9, size, pts: size > 0.7 ? 80 : 30, obj, mesh: m, spin: new THREE.Vector3(rand(-2, 2), rand(-2, 2), rand(-2, 2)), age: 0 });
   }
+  function turret(x) {
+    const obj = new THREE.Group();
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), MAT.hullDark);
+    const base = new THREE.Mesh(GEO.box, MAT.hull); base.scale.set(1.1, 0.18, 0.8);
+    const pivot = new THREE.Group(); pivot.position.y = 0.3;
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.75, 8), MAT.hull);
+    barrel.rotation.z = -Math.PI / 2; barrel.position.x = 0.38; pivot.add(barrel);
+    const eye = glow(0xff5a6e, 0.7, 0.9); eye.position.set(0, 0.3, 0.45);
+    obj.add(base, dome, pivot, eye);
+    return addEnemy({ type: 'turret', x, y: groundY(x), hp: 3 + stage, r: 0.55, pts: 150, obj, mesh: dome, pivot, fire: rand(1, 2), age: 0 });
+  }
   function carrier(x, y) {
     const obj = new THREE.Group();
     const body = new THREE.Mesh(GEO.box, MAT.hull); body.scale.set(2.4, 1.1, 0.5);
@@ -635,6 +721,7 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
     if (stage >= 1) opts.push(['lancers', 1 + stage * 0.5]);
     opts.push(['orb', 0.8 + stage * 0.6]);
     if (stage >= 2) opts.push(['mixed', stage * 0.7]);
+    opts.push(['turrets', 1.4 + stage * 0.3]);
     let total = 0; for (const o of opts) total += o[1];
     let r = Math.random() * total, kind = opts[0][0];
     for (const o of opts) { r -= o[1]; if (r <= 0) { kind = o[0]; break; } }
@@ -644,6 +731,7 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
     else if (kind === 'snake') { const y = rand(-1.5, 1.5); for (let i = 0; i < 7; i++) mite(X + i * 0.9, y, { amp: FY * 0.6, freq: 1.6, ph: i * 0.45 }); }
     else if (kind === 'rocks') { const n = 3 + Math.floor(Math.random() * 2); for (let i = 0; i < n; i++) rock(X + rand(0, 4), rand(-FY + 1, FY - 1), rand(0.75, 1.15)); }
     else if (kind === 'lancers') { const n = stage >= 3 ? 3 : 2; for (let i = 0; i < n; i++) lancer(X + i * 1.5, (i - (n - 1) / 2) * 2.6); }
+    else if (kind === 'turrets') { const n = stage >= 3 ? 3 : 2; for (let i = 0; i < n; i++) turret(X + i * rand(2.5, 4)); }
     else if (kind === 'orb') { orb(X, rand(-FY + 1.5, FY - 1.5)); if (stage >= 3 && Math.random() < 0.5) orb(X + 3, rand(-FY + 1.5, FY - 1.5)); }
     else { const y = rand(-FY + 1.5, FY - 1.5); orb(X + 1.5, y); for (let i = 0; i < 4; i++) mite(X + i * 1.1, -y * 0.6, { amp: 1, ph: i * 0.7 }); }
   }
@@ -652,32 +740,32 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
   function spawnBoss() {
     const th = THEMES[(stage - 1) % THEMES.length];
     const obj = new THREE.Group();
-    const coreMat = new THREE.MeshStandardMaterial({ color: 0x2a2e3c, emissive: th.boss, emissiveIntensity: 0.5, metalness: 0.7, roughness: 0.35, flatShading: true });
-    const core = new THREE.Mesh(GEO.ico, coreMat); core.scale.setScalar(1.45);
-    const inner = glow(th.boss, 4.6, 0.22);
-    const armorGroup = new THREE.Group();
-    const armorMat = new THREE.MeshStandardMaterial({ color: 0x4a5064, metalness: 0.8, roughness: 0.35 });
-    const segs = [];
-    const nSeg = 6 + Math.min(stage - 1, 4);
-    for (let i = 0; i < nSeg; i++) {
-      const m = new THREE.Mesh(GEO.box, armorMat); m.scale.set(0.5, 1.0, 0.6);
-      const a = i / nSeg * Math.PI * 2;
-      m.position.set(Math.cos(a) * 2.4, Math.sin(a) * 2.4, 0); m.rotation.z = a;
-      const light = new THREE.Mesh(GEO.box, new THREE.MeshBasicMaterial({ color: th.boss })); light.scale.set(0.52, 0.18, 0.62);
-      m.add(light);
-      armorGroup.add(m);
-      segs.push({ m, a, hp: 6 + stage * 2, alive: true });
+    const bellMat = new THREE.MeshStandardMaterial({ color: th.boss, emissive: th.boss, emissiveIntensity: 0.25, transparent: true, opacity: 0.78, roughness: 0.25, metalness: 0.1, side: THREE.DoubleSide });
+    const bell = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 20, 0, Math.PI * 2, 0, Math.PI * 0.55), bellMat);
+    const ribs = new THREE.Mesh(new THREE.SphereGeometry(1.01, 12, 6, 0, Math.PI * 2, 0, Math.PI * 0.55), new THREE.MeshBasicMaterial({ color: th.boss, wireframe: true, transparent: true, opacity: 0.35 }));
+    bell.add(ribs);
+    const rim = new THREE.Mesh(GEO.torus, new THREE.MeshBasicMaterial({ color: th.boss }));
+    rim.rotation.x = Math.PI / 2; rim.position.y = -0.24; rim.scale.set(1.86, 1.86, 1.5);
+    const nucMat = new THREE.MeshStandardMaterial({ color: 0x1a1d28, emissive: 0xffffff, emissiveIntensity: 0.6, roughness: 0.3, flatShading: true });
+    const nucleus = new THREE.Mesh(GEO.ico, nucMat); nucleus.scale.setScalar(0.62); nucleus.position.y = 0.45;
+    const nGlow = glow(th.boss, 3.4, 0.45); nGlow.position.y = 0.45;
+    obj.add(bell, rim, nGlow, nucleus);
+    const tents = [];
+    const segMat = new THREE.MeshStandardMaterial({ color: th.boss, emissive: th.boss, emissiveIntensity: 0.4, transparent: true, opacity: 0.9, roughness: 0.4 });
+    const nT = 6 + Math.min(stage - 1, 2), nS = 9;
+    for (let k = 0; k < nT; k++) {
+      const a = k / nT * Math.PI * 2;
+      const tn = { ax: Math.cos(a) * 1.45, az: Math.sin(a) * 1.45, ph: rand(0, 6.28), segs: [], rs: [] };
+      for (let i = 0; i < nS; i++) {
+        const r = 0.24 - i * 0.017;
+        const m = new THREE.Mesh(GEO.low, segMat); m.scale.setScalar(r);
+        obj.add(m); tn.segs.push(m); tn.rs.push(r);
+      }
+      const tip = glow(th.boss, 0.8, 0.9); tn.segs[nS - 1].add(tip); tip.scale.setScalar(0.8 / tn.rs[nS - 1]);
+      tents.push(tn);
     }
-    const pods = [];
-    for (const s of [-1, 1]) {
-      const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, 1.4, 8), armorMat);
-      pod.rotation.z = Math.PI / 2; pod.position.set(0.6, s * 3.4, 0);
-      const pg = glow(th.boss, 1.2, 0.8); pg.position.set(-0.2, s * 3.4, 0.1);
-      obj.add(pod, pg); pods.push(s);
-    }
-    obj.add(inner, core, armorGroup);
-    const hp = 90 + (stage - 1) * 50;
-    boss = { obj, core, coreMat, armorGroup, segs, x: FX + 7, y: 0, hp, maxHp: hp, t: 0, pattern: 0, patT: 1.5, sub: 0, subT: 0, spiralA: 0, flashT: 0, color: th.boss, dying: 0 };
+    const hp = 100 + (stage - 1) * 55;
+    boss = { obj, bell, nucleus, nucMat, tents, tentPts: [], x: FX + 7, y: 1, hp, maxHp: hp, t: 0, pattern: 0, patT: 1.5, sub: 0, spiralA: 0, flashT: 0, color: th.boss, dying: 0 };
     scene.add(obj);
     $('bossName').textContent = th.name; $('bossbar').hidden = false;
     $('bossFill').style.transform = 'scaleX(1)';
@@ -688,19 +776,20 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
     const p = pats[b.pattern % pats.length];
     if (p === 'radial') {
       const n = 12 + stage * 2, off = Math.random();
-      for (let i = 0; i < n; i++) { const a = (i + off) / n * Math.PI * 2; fireE(b.x - 0.5, b.y, Math.cos(a) * bs, Math.sin(a) * bs, 1); }
+      for (let i = 0; i < n; i++) { const a = (i + off) / n * Math.PI * 2; fireE(b.x, b.y + 0.45, Math.cos(a) * bs, Math.sin(a) * bs, 1); }
       b.subT = 0; return 'done';
     }
     if (p === 'aimed') {
-      const base = Math.atan2(player.y - b.y, player.x - b.x), n = 3 + Math.min(stage, 3) * 2 - 2;
-      for (let i = 0; i < n; i++) { const a = base + (i - (n - 1) / 2) * 0.16; fireE(b.x - 1.4, b.y, Math.cos(a) * (bs + 2), Math.sin(a) * (bs + 2), 0); }
+      for (const tp of b.tentPts) if (tp.tip) { const a = Math.atan2(player.y - tp.y, player.x - tp.x); fireE(tp.x, tp.y, Math.cos(a) * (bs + 1.5), Math.sin(a) * (bs + 1.5), 0); }
       b.sub++; return b.sub >= 3 ? 'done' : 0.35;
     }
     if (p === 'spiral') {
-      for (const s of [0, Math.PI]) { const a = b.spiralA + s; fireE(b.x, b.y, Math.cos(a) * bs * 0.85, Math.sin(a) * bs * 0.85, 1); }
+      for (const s of [0, Math.PI]) { const a = b.spiralA + s; fireE(b.x, b.y + 0.45, Math.cos(a) * bs * 0.85, Math.sin(a) * bs * 0.85, 1); }
       b.spiralA += 0.33; b.sub++; return b.sub >= 26 ? 'done' : 0.075;
     }
-    lancer(b.x + 0.6, b.y - 3.4); lancer(b.x + 0.6, b.y + 3.4); return 'done';
+    for (let i = 0; i < 3; i++) mite(b.x - 1.5, b.y + 0.5 + (i - 1) * 1.2, { vx: -(4 + stage * 0.3), amp: 0.8, ph: i, fire: 99 });
+    if (stage >= 2) lancer(b.x - 1, b.y + 2.4);
+    return 'done';
   }
 
   // ================= shooting & damage =================
@@ -732,7 +821,7 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
     e.dead = true;
     score += e.pts * (byBomb ? 1 : 1);
     const big = e.type === 'carrier' || e.type === 'orb';
-    burst(e.x, e.y, e.type === 'rock' ? '#c9b4a5' : e.type === 'lancer' ? '#ff7a8a' : e.type === 'orb' ? '#7dffe1' : e.type === 'carrier' ? '#ffb35c' : '#b8a2ff', big ? 46 : 22, big ? 7 : 5);
+    burst(e.x, e.y, e.type === 'turret' ? '#ff9a6e' : e.type === 'rock' ? '#c9b4a5' : e.type === 'lancer' ? '#ff7a8a' : e.type === 'orb' ? '#7dffe1' : e.type === 'carrier' ? '#ffb35c' : '#b8a2ff', big ? 46 : 22, big ? 7 : 5);
     flash(e.x, e.y, 0xffffff, big ? 4.5 : 2.4);
     shake = Math.max(shake, big ? 0.25 : 0.08);
     if (big) SND.boom(); else SND.pop();
@@ -868,13 +957,12 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
     if (!drag || e.pointerId !== drag.id || !player || !player.alive) return;
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     drag.x = e.clientX; drag.y = e.clientY;
-    moveByScreen(dx, dy, 2 * FY / Math.min(W, H) * 1.35);
+    moveByScreen(dx, dy, unitsPerPx * 1.3);
   });
   const endDrag = (e) => { if (drag && e.pointerId === drag.id) drag = null; };
   gl.addEventListener('pointerup', endDrag); gl.addEventListener('pointercancel', endDrag);
   function moveByScreen(dx, dy, f) {
-    if (portrait) { player.x += -dy * f; player.y += -dx * f; player.vy = -dx * f; }
-    else { player.x += dx * f; player.y += -dy * f; player.vy = -dy * f; }
+    player.x += dx * f; player.y += -dy * f; player.vy = -dy * f;
     player.x = clamp(player.x, -FX + 0.8, FX * 0.55);
     player.y = clamp(player.y, -FY + 0.6, FY - 0.6);
   }
@@ -898,6 +986,8 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
     for (let i = 0; i < DUST_N; i++) { dustPos[i * 3] -= 26 * dt; if (dustPos[i * 3] < -40) { dustPos[i * 3] += 80; dustPos[i * 3 + 1] = rand(-20, 20); } }
     dustGeo.attributes.position.needsUpdate = true;
     bgPlanet.rotation.z += dt * 0.03; bgPlanet.rotation.y += dt * 0.05;
+    if (state !== 'over' || player.alive) TER.scroll += SCROLL * dt;
+    layoutTerrain(false);
     bgRing.position.copy(bgPlanet.position);
 
     if (player.alive && state === 'play') {
@@ -909,6 +999,8 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
       player.fireT -= dt;
       if (player.fireT <= 0) { firePlayer(); player.fireT = player.wpn >= 4 ? 0.11 : 0.14; }
       player.inv = Math.max(0, player.inv - dt);
+      const gy = groundY(player.x) + 0.35;
+      if (player.y < gy) { player.y = gy + 0.4; hurtPlayer(); }
 
       // stage flow
       if (phase === 'waves') {
@@ -930,18 +1022,11 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
       if (!b.on) continue;
       b.x += b.vx * dt; b.y += b.vy * dt;
       if (b.x > FX + 4 || Math.abs(b.y) > FY + 3) { drop(b); continue; }
+      if (b.y < groundY(b.x)) { burst(b.x, b.y, '#c9b4a5', 3, 2); drop(b); continue; }
       let hit = false;
       if (boss && !boss.dying) {
-        for (const s of boss.segs) {
-          if (!s.alive) continue;
-          const sx = boss.x + Math.cos(s.a + boss.armorGroup.rotation.z) * 2.4, sy = boss.y + Math.sin(s.a + boss.armorGroup.rotation.z) * 2.4;
-          if (Math.hypot(b.x - sx, b.y - sy) < 0.6) {
-            hit = true; s.hp--; burst(b.x, b.y, '#c9cfee', 3, 3); SND.hit();
-            if (s.hp <= 0) { s.alive = false; s.m.visible = false; burst(sx, sy, '#ffb35c', 26, 6); flash(sx, sy, 0xffffff, 2.5); SND.pop(); score += 150; renderHud(); }
-            break;
-          }
-        }
-        if (!hit && Math.hypot(b.x - boss.x, b.y - boss.y) < 1.55) { hit = true; damageBoss(1); burst(b.x, b.y, '#ffffff', 3, 3); }
+        for (const tp of boss.tentPts) if (Math.hypot(b.x - tp.x, b.y - tp.y) < tp.r + 0.1) { hit = true; burst(b.x, b.y, '#c9cfee', 2, 2); break; }
+        if (!hit && Math.hypot(b.x - boss.x, b.y - (boss.y + 0.3)) < 1.75) { hit = true; damageBoss(1); burst(b.x, b.y, '#ffffff', 3, 3); SND.hit(); }
       }
       if (!hit) for (const e of enemies) {
         if (e.dead) continue;
@@ -953,7 +1038,7 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
     for (const b of ebolts) {
       if (!b.on) continue;
       b.x += b.vx * dt; b.y += b.vy * dt;
-      if (b.x < -FX - 3 || b.x > FX + 6 || Math.abs(b.y) > FY + 3) { drop(b); continue; }
+      if (b.x < -FX - 3 || b.x > FX + 6 || Math.abs(b.y) > FY + 3 || b.y < groundY(b.x)) { drop(b); continue; }
       if (player.alive && Math.hypot(b.x - player.x, b.y - player.y) < (player.shield ? 0.7 : 0.32)) { drop(b); hurtPlayer(); }
     }
 
@@ -982,11 +1067,19 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
       } else if (e.type === 'rock') {
         e.x += e.vx * dt; e.y += e.vy * dt; if (Math.abs(e.y) > FY - 0.3) e.vy *= -1;
         e.mesh.rotation.x += e.spin.x * dt; e.mesh.rotation.y += e.spin.y * dt; e.mesh.rotation.z += e.spin.z * dt;
+      } else if (e.type === 'turret') {
+        e.x -= SCROLL * dt; e.y = groundY(e.x) + 0.05;
+        const a = Math.atan2(player.y - (e.y + 0.3), player.x - e.x);
+        e.pivot.rotation.z = clamp(a, 0.15, Math.PI - 0.15);
+        e.fire -= dt;
+        if (e.fire <= 0 && e.x < FX && e.x > -FX * 0.7) { const aa = e.pivot.rotation.z, sp = 5 + stage * 0.4; fireE(e.x + Math.cos(aa) * 0.8, e.y + 0.3 + Math.sin(aa) * 0.8, Math.cos(aa) * sp, Math.sin(aa) * sp, 1); e.fire = rand(1.6, 2.6) - stage * 0.1; }
       } else if (e.type === 'carrier') {
         e.x += e.vx * dt; e.y += Math.sin(e.age * 0.7) * dt * 0.6;
         e.fire -= dt;
         if (e.fire <= 0 && e.x < FX) { aimAt(e.x - 1.5, e.y, 4.5 + stage * 0.4, 0.3, 3); e.fire = 2.2; }
       }
+      if (e.type !== 'turret' && e.type !== 'rock') { const floor = groundY(e.x) + e.r + 0.25; if (e.y < floor) { e.y = floor; if (e.y0 !== undefined) e.y0 += (floor - e.y0) * 0.1; } }
+      if (e.type === 'rock' && e.y - e.r < groundY(e.x)) { e.y = groundY(e.x) + e.r; e.vy = Math.abs(e.vy) + 0.4; }
       if (e.hitT > 0) { e.hitT -= dt; e.obj.scale.setScalar(1.18); } else e.obj.scale.setScalar(1);
       e.obj.position.set(e.x, e.y, 0);
       if (e.x < -FX - 4) e.dead = true;
@@ -1001,10 +1094,10 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
     if (boss) {
       const b = boss;
       b.t += dt;
-      const targetX = FX - 4.2;
+      const targetX = FX - 3.6;
       if (b.dying) {
         b.dying -= dt;
-        b.obj.rotation.z += dt * 2;
+        b.obj.rotation.z = Math.sin(b.t * 9) * 0.15; b.y -= dt * 0.8;
         if (Math.random() < dt * 14) { const ex = b.x + rand(-2.5, 2.5), ey = b.y + rand(-2.5, 2.5); burst(ex, ey, pick(['#ffb35c', '#ff6a8a', '#ffffff']), 20, 6); flash(ex, ey, 0xffffff, 3); SND.pop(); }
         shake = Math.max(shake, 0.2);
         if (b.dying <= 0) {
@@ -1018,10 +1111,11 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
         }
       } else {
         if (b.x > targetX) b.x -= 3 * dt;
-        b.y = Math.sin(b.t * 0.55) * FY * 0.28;
-        b.armorGroup.rotation.z += dt * (0.8 + stage * 0.1);
-        b.core.rotation.x += dt * 0.6; b.core.rotation.y += dt * 0.9;
-        b.coreMat.emissiveIntensity = b.flashT > 0 ? 0.75 : 0.45 + Math.sin(b.t * 3) * 0.12;
+        b.y = 1.1 + Math.sin(b.t * 0.6) * FY * 0.22;
+        const pulse = 1 + Math.sin(b.t * 2.4) * 0.07;
+        b.bell.scale.set(1.9 * pulse, 1.55 / pulse, 1.9 * pulse);
+        b.nucleus.rotation.x += dt; b.nucleus.rotation.y += dt * 1.3;
+        b.nucMat.emissiveIntensity = b.flashT > 0 ? 1.2 : 0.55 + Math.sin(b.t * 3) * 0.12;
         if (b.flashT > 0) b.flashT -= dt;
         if (b.x <= targetX + 0.5 && state === 'play') {
           b.patT -= dt;
@@ -1031,7 +1125,19 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
             else b.patT = res;
           }
         }
-        if (player.alive && Math.hypot(player.x - b.x, player.y - b.y) < 1.9) hurtPlayer();
+        if (player.alive && Math.hypot(player.x - b.x, player.y - (b.y + 0.3)) < 2) hurtPlayer();
+      }
+      if (boss) {
+        b.tentPts.length = 0;
+        for (const tn of b.tents) {
+          for (let i = 0; i < tn.segs.length; i++) {
+            const sway = Math.sin(b.t * 2.2 - i * 0.45 + tn.ph) * 0.09 * i;
+            const lx = tn.ax * (1 - i * 0.05) + i * 0.16 + sway, ly = -0.35 - i * 0.33, lz = tn.az * (1 - i * 0.06) + Math.cos(b.t * 1.7 - i * 0.4 + tn.ph) * 0.05 * i;
+            tn.segs[i].position.set(lx, ly, lz);
+            b.tentPts.push({ x: b.x + lx, y: b.y + ly, r: tn.rs[i], tip: i === tn.segs.length - 1 });
+          }
+        }
+        if (!b.dying && player.alive) for (const tp of b.tentPts) if (Math.hypot(player.x - tp.x, player.y - tp.y) < tp.r + 0.3) { hurtPlayer(); break; }
       }
       if (boss) b.obj.position.set(b.x, b.y, 0);
     }
@@ -1040,6 +1146,7 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
     for (const p of pickups) {
       p.age += dt;
       p.x -= 1.6 * dt; p.y += Math.sin(p.age * 2) * dt * 0.4;
+      p.y = Math.max(p.y, groundY(p.x) + 0.7);
       const dx = player.x - p.x, dy = player.y - p.y, d = Math.hypot(dx, dy);
       if (player.alive && d < 2.2 && d > 0.01) { p.x += dx / d * 6 * dt; p.y += dy / d * 6 * dt; }
       p.obj.position.set(p.x, p.y, 0.2 + Math.sin(p.age * 3) * 0.1);
@@ -1078,8 +1185,9 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
     if (player.alive) {
       ship.position.set(player.x, player.y, 0);
       player.vy *= Math.pow(0.001, dt);
-      player.roll += (clamp(player.vy * 6, -0.7, 0.7) - player.roll) * Math.min(1, dt * 8);
-      ship.rotation.x = player.roll;
+      player.roll += (clamp(player.vy * 5, -0.45, 0.45) - player.roll) * Math.min(1, dt * 8);
+      ship.rotation.z = player.roll;            // nose lifts when climbing
+      ship.rotation.x = 0.35 + player.roll * 0.6; // slight bank so the wings read in 3D
       const thrust = 0.55 + Math.random() * 0.2;
       for (const fl of flames) { fl.scale.set(1, thrust, 1); fl.position.x = -0.58 - thrust / 2; }
       shieldMesh.visible = shieldRing.visible = player.shield;
@@ -1095,8 +1203,8 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
 
   // ================= loop =================
   function render() {
-    const sx = player && player.alive ? (portrait ? 0 : player.x * 0.04) : 0;
-    const sy = player && player.alive ? player.y * 0.05 : 0;
+    const sx = player && player.alive ? player.x * 0.04 : 0;
+    const sy = player && player.alive ? player.y * 0.04 : 0;
     placeCamera(D, sx + (shake > 0.01 ? rand(-shake, shake) : 0), sy + (shake > 0.01 ? rand(-shake, shake) : 0));
     if (composer) composer.render(); else renderer.render(scene, camera);
   }
@@ -1118,7 +1226,8 @@ h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(
   resize(); reset();
   // attract mode: a few drones drift past behind the title
   for (let i = 0; i < 5; i++) mite(FX * 0.2 + i * 1.3, 1.5, { amp: 1, ph: i * 0.6, vx: -1.2, fire: 99 });
-  rock(FX * 0.6, -2.5, 1);
+  rock(FX * 0.6, 1.5, 1);
+  turret(FX * 0.5);
   requestAnimationFrame(frame);
 })();
 </script>
